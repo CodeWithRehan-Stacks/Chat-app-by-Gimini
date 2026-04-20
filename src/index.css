@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+@theme {
+  --color-workspace: #040405;
+  --color-sidebar: #121214;
+  --color-chat: #18181B;
+  --color-theme-border: #1F1F23;
+  --color-accent-indigo: #6366F1;
+  --color-text-zinc: #F4F4F5;
+  --color-text-muted: #71717A;
+  --color-input-bg: #27272A;
+  --color-input-border: #3F3F46;
+}

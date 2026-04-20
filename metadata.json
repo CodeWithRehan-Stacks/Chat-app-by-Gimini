@@ -1,0 +1,6 @@
+{
+  "name": "Remix: SyncChat",
+  "description": "A high-performance real-time collaboration app with channels, real-time messaging, and role-based access.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

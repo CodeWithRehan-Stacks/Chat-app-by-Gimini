@@ -1,0 +1,77 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isUserVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isOwner(userId) && 
+                     incoming().keys().hasAll(['uid', 'email', 'role', 'createdAt']) &&
+                     incoming().role == 'member'; // Users can't make themselves admin
+      allow update: if (isSignedIn() && isOwner(userId)) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'status'])
+      ) || isAdmin();
+    }
+
+    // Channels Collection
+    match /channels/{channelId} {
+      allow read: if isSignedIn();
+      allow create: if isUserVerified() && 
+                     incoming().keys().hasAll(['name', 'createdBy', 'createdAt', 'type']) &&
+                     incoming().createdBy == request.auth.uid;
+      allow update: if (isSignedIn() && (existing().createdBy == request.auth.uid || isAdmin())) && (
+        incoming().diff(existing()).affectedKeys().hasOnly(['name', 'description'])
+      );
+      allow delete: if isSignedIn() && (existing().createdBy == request.auth.uid || isAdmin());
+
+      // Messages Subcollection
+      match /messages/{messageId} {
+        allow read: if isSignedIn();
+        allow create: if isUserVerified() && 
+                       incoming().keys().hasAll(['channelId', 'senderId', 'senderName', 'text', 'createdAt']) &&
+                       incoming().senderId == request.auth.uid &&
+                       isValidId(channelId);
+        allow update: if (isSignedIn() && isOwner(existing().senderId)) && (
+          incoming().diff(existing()).affectedKeys().hasOnly(['text', 'updatedAt'])
+        ) || isAdmin();
+        allow delete: if isSignedIn() && (isOwner(existing().senderId) || isAdmin());
+      }
+    }
+  }
+}
